@@ -100,6 +100,8 @@
 <div class="modal top" id="textDlg" hidden>
   <div class="sheet">
     <h3>Testo</h3>
+    <button type="button" class="qtoggle" id="quickToggle" aria-expanded="false">Parole rapide <span id="quickArrow">&#9662;</span></button>
+    <div class="quick" id="quickList" hidden></div>
     <textarea id="textInput" rows="3" placeholder="Scrivi la nota..."></textarea>
     <div class="row">
       <button id="textCancel">Annulla</button>
@@ -117,6 +119,7 @@
     <button class="mbtn" id="mPdf">Crea PDF delle foto...</button>
     <button class="mbtn" id="mDir" hidden>Apri cartella</button>
     <button class="mbtn" id="mSettings">Impostazioni</button>
+    <button class="mbtn" id="mVersion">Versione e novit&agrave; <span class="badge" id="verBadge" hidden>Aggiornamento</span></button>
     <button class="mbtn" id="mClose">Chiudi</button>
   </div>
 </div>
@@ -157,6 +160,19 @@
     <label class="chk"><input type="checkbox" id="setAuto"> Salva automaticamente (_mid) quando cambi foto</label>
     <p class="hint" id="setInfo"></p>
     <button class="mbtn" id="setClose">Chiudi</button>
+  </div>
+</div>
+
+<!-- Versione e note di versione -->
+<div class="modal" id="verDlg" hidden>
+  <div class="sheet">
+    <h3>Versione e novit&agrave;</h3>
+    <p class="verline">Installata: <b id="verCur">-</b></p>
+    <p class="verline">Ultima disponibile: <b id="verLast">controllo...</b></p>
+    <button class="mbtn primary" id="verApply" hidden>Aggiorna ora</button>
+    <button class="mbtn" id="verCheck">Controlla aggiornamenti</button>
+    <div class="notes" id="verNotes"></div>
+    <button class="mbtn" id="verClose">Chiudi</button>
   </div>
 </div>
 

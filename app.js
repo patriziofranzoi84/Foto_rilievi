@@ -5,6 +5,17 @@
   const MAX_WORK = 3200;     // lato lungo massimo dell'immagine di lavoro (px)
   const MAX_SAVE = 1600;     // lato lungo massimo dei file _mid (px) - usare 1920 per file piu' grandi
   const QUALITY = 0.75;      // qualita' JPEG dei file _mid
+  const APP_VERSION = '1.1.0';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
+
+  // Parole rapide per le note di testo (in ordine alfabetico)
+  const QUICK_WORDS = [
+    'dettaglio', 'infiltrazione', 'estradosso', 'intradosso', 'punto di insufflazione', 'scarico',
+    'videoispezione', 'presenza gocce d\u0027acqua', 'palloncino otturatore', 'fuoriuscita gas', 'volumetrico',
+    'igrometro umidit\u00E0 %', 'pluviale', 'scossalina', 'parapetto', 'porta', 'finestra', 'soglia',
+    'battiscopa', 'pozzetto', 'diametro insufficiente', 'ostruzione', 'distacco intonaco',
+    'distacco pitturazione', 'crepa', 'distacco guaina', 'in fase di asciugatura', 'cavillature',
+    'attraversamento impiantistico', 'umidit\u00E0 di risalita', 'quota insufficiente'
+  ].sort((a, b) => a.localeCompare(b, 'it'));
 
   const $ = (id) => document.getElementById(id);
   const photos = [];
@@ -293,16 +304,132 @@
     }
   }
 
+  /* ---------- parole rapide nel dialogo testo ---------- */
+  function buildQuick() {
+    const box = $('quickList');
+    QUICK_WORDS.forEach((w) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = w;
+      b.addEventListener('pointerdown', (e) => e.preventDefault());     // la tastiera resta aperta
+      b.addEventListener('click', () => addQuickWord(w));
+      box.appendChild(b);
+    });
+    const tg = $('quickToggle');
+    tg.addEventListener('pointerdown', (e) => e.preventDefault());
+    tg.addEventListener('click', () => setQuickOpen(box.hidden));
+  }
+  function setQuickOpen(open) {
+    $('quickList').hidden = !open;
+    $('quickToggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+    $('quickArrow').textContent = open ? '\u25B4' : '\u25BE';
+  }
+  function addQuickWord(w) {          // inserisce la parola nel punto del cursore, separata da virgola
+    const t = $('textInput'), v = t.value;
+    const s = typeof t.selectionStart === 'number' ? t.selectionStart : v.length;
+    const e = typeof t.selectionEnd === 'number' ? t.selectionEnd : s;
+    const before = v.slice(0, s), after = v.slice(e);
+    let sep = '';
+    if (before.trim() !== '' && !/(,|\n)\s*$/.test(before)) sep = ', ';
+    else if (/,$/.test(before)) sep = ' ';
+    t.value = before + sep + w + after;
+    const p = (before + sep + w).length;
+    t.setSelectionRange(p, p);
+  }
+
   /* ---------- dialogo testo ---------- */
   function askText(initial, done) {
     textDone = done;
     $('textInput').value = initial || '';
+    setQuickOpen(false);
     show('textDlg');
     setTimeout(() => {
       const t = $('textInput');
       t.focus();
       t.setSelectionRange(t.value.length, t.value.length);
     }, 60);
+  }
+
+  /* ---------- versione e aggiornamenti ---------- */
+  let remote = null;                  // contenuto di version.json letto dalla rete
+  const verNum = (v) => String(v || '0').split('.').map((n) => parseInt(n, 10) || 0);
+  function cmpVer(a, b) {
+    const x = verNum(a), y = verNum(b);
+    for (let i = 0; i < Math.max(x.length, y.length); i++) {
+      const d = (x[i] || 0) - (y[i] || 0);
+      if (d) return d > 0 ? 1 : -1;
+    }
+    return 0;
+  }
+  const hasUpdate = () => !!remote && cmpVer(remote.version, APP_VERSION) > 0;
+
+  async function fetchRemote() {
+    try {
+      const r = await fetch('version.json?_=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error('http ' + r.status);
+      remote = await r.json();
+      return true;
+    } catch (e) { return false; }
+  }
+
+  async function applyUpdate() {       // svuota la cache dell'app e ricarica: il service worker riscarica i file nuovi
+    busy(true, 'Aggiornamento alla versione ' + (remote ? remote.version : '') + '...');
+    try { sessionStorage.setItem('fr_upd', remote ? remote.version : '1'); } catch (e) { /* ignora */ }
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.update().catch(() => {})));
+      }
+      if (window.caches) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch (e) { console.warn(e); }
+    location.reload();
+  }
+
+  function refreshVerUI() {
+    $('verBadge').hidden = !hasUpdate();
+    $('verCur').textContent = APP_VERSION;
+    $('verLast').textContent = remote ? remote.version + (hasUpdate() ? ' (nuova)' : ' (aggiornata)') : 'non disponibile (offline?)';
+    $('verApply').hidden = !hasUpdate();
+    const box = $('verNotes');
+    box.innerHTML = '';
+    const list = (remote && remote.storico) || [];
+    list.forEach((v) => {
+      const h = document.createElement('h4');
+      h.textContent = 'Versione ' + v.versione + (v.data ? ' - ' + v.data : '');
+      const ul = document.createElement('ul');
+      (v.note || []).forEach((n) => { const li = document.createElement('li'); li.textContent = n; ul.appendChild(li); });
+      box.append(h, ul);
+    });
+    if (!list.length) {
+      const p = document.createElement('p');
+      p.className = 'hint';
+      p.textContent = 'Note di versione non disponibili.';
+      box.appendChild(p);
+    }
+  }
+
+  async function openVersion() {
+    hide('menuDlg');
+    $('verLast').textContent = 'controllo...';
+    refreshVerUI();
+    $('verLast').textContent = 'controllo...';
+    show('verDlg');
+    await fetchRemote();
+    refreshVerUI();
+  }
+
+  async function startupCheck() {        // all'apertura: se c'e' una versione nuova la scarica e riavvia l'app
+    if (!(await fetchRemote())) return;
+    refreshVerUI();
+    if (!hasUpdate()) { try { sessionStorage.removeItem('fr_upd'); } catch (e) { /* ignora */ } return; }
+    let tried = null;
+    try { tried = sessionStorage.getItem('fr_upd'); } catch (e) { /* ignora */ }
+    if (tried === remote.version) { toast('Aggiornamento ' + remote.version + ' non applicato: riprova da Menu > Versione e novit\u00E0', 4500); return; }
+    if (photos.some(isDirty)) { toast('Nuova versione ' + remote.version + ' disponibile: Menu > Versione e novit\u00E0', 4500); return; }
+    await applyUpdate();
   }
 
   /* ---------- icona per la schermata Home (iOS legge apple-touch-icon) ---------- */
@@ -364,11 +491,26 @@
       hide('menuDlg');
       $('setAuto').checked = settings.autosave;
       $('setInfo').textContent = dirHandle
-        ? 'I file _mid vengono salvati nella cartella aperta (nome originale + _mid.jpg).'
-        : 'I file _mid vengono scaricati sul telefono (cartella Download). Alla riapertura di una foto gia\u0027 salvata il browser puo\u0027 aggiungere un numero al nome.';
+        ? 'Sovrascrittura attiva: i file _mid vengono salvati nella cartella aperta (nome originale + _mid.jpg) e sostituiscono quelli precedenti.'
+        : (window.showDirectoryPicker
+          ? 'Per sovrascrivere i file _mid usa "Apri cartella" invece di "Apri foto": cosi\u0027 il salvataggio sostituisce il file precedente.'
+          : 'Questo browser non permette di sovrascrivere i file: i _mid vengono scaricati (cartella Download) e se salvi di nuovo la stessa foto Android aggiunge un numero al nome, es. (1).');
       show('setDlg');
     });
     $('mClose').addEventListener('click', () => hide('menuDlg'));
+    $('mVersion').addEventListener('click', openVersion);
+    $('verCheck').addEventListener('click', async () => {
+      $('verLast').textContent = 'controllo...';
+      const ok = await fetchRemote();
+      refreshVerUI();
+      if (!ok) toast('Impossibile controllare: sei offline?');
+      else if (!hasUpdate()) toast('Hai gia\u0027 l\u0027ultima versione');
+    });
+    $('verApply').addEventListener('click', () => {
+      if (photos.some(isDirty) && !confirm('Ci sono modifiche non salvate che andranno perse. Aggiornare comunque?')) return;
+      applyUpdate();
+    });
+    $('verClose').addEventListener('click', () => hide('verDlg'));
     $('setAuto').addEventListener('change', () => { settings.autosave = $('setAuto').checked; saveSettings(); });
     $('setClose').addEventListener('click', () => hide('setDlg'));
 
@@ -395,7 +537,7 @@
     $('textCancel').addEventListener('click', () => { hide('textDlg'); textDone = null; });
 
     // tocco sullo sfondo scuro chiude i dialoghi (tranne il testo)
-    ['menuDlg', 'setDlg', 'readyDlg', 'pdfDlg'].forEach((id) => {
+    ['menuDlg', 'setDlg', 'readyDlg', 'pdfDlg', 'verDlg'].forEach((id) => {
       $(id).addEventListener('click', (e) => { if (e.target === $(id)) hide(id); });
     });
 
@@ -412,11 +554,14 @@
     askText: askText
   });
   wire();
+  buildQuick();
   syncUI(Editor.getUI());
   refreshHeader();
   makeAppleIcon();
+  $('verCur').textContent = APP_VERSION;
 
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+  startupCheck();
 })();

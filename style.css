@@ -107,6 +107,36 @@ textarea{
 .chk{display:flex;align-items:center;gap:12px;font-size:17px;padding:10px 0}
 .chk input{width:26px;height:26px;flex:none}
 
+/* Parole rapide nel dialogo testo */
+.qtoggle{
+  display:flex;align-items:center;justify-content:space-between;width:100%;min-height:52px;margin:0 0 8px;
+  border:0;border-radius:12px;background:var(--btn);font-size:17px;font-weight:600;padding:0 16px;
+}
+.qtoggle[aria-expanded="true"]{background:var(--btn2)}
+.quick{
+  display:flex;flex-wrap:wrap;gap:6px;max-height:34vh;overflow:auto;margin-bottom:8px;padding:8px;
+  border:1px solid var(--line);border-radius:12px;background:#0d0f11;
+}
+.quick button{
+  min-height:44px;border:0;border-radius:22px;background:var(--btn);color:var(--txt);
+  font-size:15px;padding:0 14px;
+}
+.quick button:active{background:var(--acc);color:#000}
+
+/* Versione e novita' */
+.badge{
+  display:inline-block;margin-left:8px;padding:2px 10px;border-radius:10px;
+  background:var(--acc);color:#000;font-size:12px;font-weight:700;vertical-align:middle;
+}
+.verline{margin:4px 0;font-size:16px}
+.notes{
+  max-height:38vh;overflow:auto;margin:8px 0;padding:4px 12px;border:1px solid var(--line);border-radius:12px;
+  -webkit-user-select:text;user-select:text;
+}
+.notes h4{margin:12px 0 4px;font-size:15px;color:var(--acc)}
+.notes ul{margin:0 0 8px;padding-left:20px}
+.notes li{margin:4px 0;font-size:15px;line-height:1.4}
+
 #toast{
   position:fixed;left:50%;top:calc(72px + env(safe-area-inset-top,0px));transform:translateX(-50%);
   max-width:92%;padding:12px 18px;border-radius:12px;background:rgba(0,0,0,.88);color:#fff;
