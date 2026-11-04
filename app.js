@@ -5,14 +5,15 @@
   const MAX_WORK = 3200;     // lato lungo massimo dell'immagine di lavoro (px)
   const MAX_SAVE = 1600;     // lato lungo massimo dei file _mid (px) - usare 1920 per file piu' grandi
   const QUALITY = 0.75;      // qualita' JPEG dei file _mid
-  const APP_VERSION = '1.5.0';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
+  const APP_VERSION = '1.5.1';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
 
   // Parole rapide per le note di testo: tre elenchi affiancati (ordine alfabetico in ciascuno).
   // Una voce puo' essere una stringa oppure { t: 'testo', sub: [...] } = con sottomenu di scelta.
   const QUICK_GROUPS = [
     { title: 'Elementi', cls: 'q-el', items: [
-      'battiscopa', 'dettaglio', 'estradosso', 'finestra', 'intradosso', 'parapetto', 'pluviale', 'porta',
-      'pozzetto', 'risvolto di base', 'scarico', 'scossalina', 'soglia'
+      'battiscopa', 'dettaglio', 'estradosso', 'finestra', 'guaina', 'intradosso', 'parapetto', 'pluviale', 'porta',
+      'porta finestra', 'pozzetto', 'risvolto di base', 'scarico', 'scossalina', 'soglia', 'solaio', 'spalletta',
+      'terrazzo'
     ] },
     { title: 'Criticit\u00E0', cls: 'q-cr', items: [
       'attraversamento impiantistico', 'cavillature', 'crepa', 'diametro insufficiente', 'distacco guaina',

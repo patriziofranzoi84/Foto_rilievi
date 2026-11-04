@@ -1,6 +1,13 @@
 {
-  "version": "1.5.0",
+  "version": "1.5.1",
   "storico": [
+    {
+      "versione": "1.5.1",
+      "data": "2026-11-04",
+      "note": [
+        "Parole rapide, Elementi: aggiunte guaina, porta finestra, solaio, spalletta, terrazzo."
+      ]
+    },
     {
       "versione": "1.5.0",
       "data": "2026-11-04",
