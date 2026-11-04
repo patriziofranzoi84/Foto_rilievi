@@ -5,7 +5,7 @@
   const MAX_WORK = 3200;     // lato lungo massimo dell'immagine di lavoro (px)
   const MAX_SAVE = 1600;     // lato lungo massimo dei file _mid (px) - usare 1920 per file piu' grandi
   const QUALITY = 0.75;      // qualita' JPEG dei file _mid
-  const APP_VERSION = '1.1.0';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
+  const APP_VERSION = '1.2.0';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
 
   // Parole rapide per le note di testo (in ordine alfabetico)
   const QUICK_WORDS = [
@@ -19,7 +19,7 @@
 
   const $ = (id) => document.getElementById(id);
   const photos = [];
-  let idx = -1, dirHandle = null, token = 0, toastT = 0, busyT = 0, readyFile = null, textDone = null;
+  let idx = -1, dirHandle = null, token = 0, toastT = 0, busyT = 0, readyFiles = null, textDone = null;
   const settings = { autosave: true };
   try {
     const s = JSON.parse(localStorage.getItem('fr_settings') || '{}');
@@ -186,6 +186,7 @@
   async function saveOne(p, silent) {
     const snap = JSON.stringify(p.annotations);
     const r = await renderJpeg(p);
+    archivePhoto(p, r);                // copia nell'archivio dell'app (per l'invio delle foto di oggi)
     const name = midName(p.name);
     let where = 'download';
     if (dirHandle) {
@@ -228,12 +229,19 @@
   }
 
   /* ---------- condivisione (menu di condivisione del telefono: Telegram, ecc.) ---------- */
-  const canShare = (f) => !!(navigator.canShare && navigator.share && navigator.canShare({ files: [f] }));
+  const canShare = (f) => {
+    const a = Array.isArray(f) ? f : [f];
+    return !!(navigator.canShare && navigator.share && navigator.canShare({ files: a }));
+  };
 
-  function showReady(file) {
-    readyFile = file;
-    $('readyInfo').textContent = file.name + ' - ' + fmtSize(file.size);
-    $('readyShare').hidden = !canShare(file);
+  function showReady(files) {            // uno o piu' file pronti: condividi / salva
+    files = Array.isArray(files) ? files : [files];
+    readyFiles = files;
+    const tot = files.reduce((s, f) => s + f.size, 0);
+    $('readyInfo').textContent = files.length === 1
+      ? files[0].name + ' - ' + fmtSize(tot)
+      : files.length + ' file - ' + fmtSize(tot);
+    $('readyShare').hidden = !canShare(files);
     show('readyDlg');
   }
 
@@ -432,6 +440,121 @@
     await applyUpdate();
   }
 
+  /* ---------- archivio delle foto modificate (IndexedDB): serve per inviare quelle di oggi ---------- */
+  const DB_NAME = 'fr_archive', STORE = 'photos', KEEP_DAYS = 7;
+  function dbOpen() {
+    return new Promise((res, rej) => {
+      if (!window.indexedDB) { rej(new Error('IndexedDB non disponibile')); return; }
+      const r = indexedDB.open(DB_NAME, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore(STORE, { keyPath: 'key' });
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  function dbTx(mode, fn) {
+    return dbOpen().then((db) => new Promise((res, rej) => {
+      const tx = db.transaction(STORE, mode);
+      const req = fn(tx.objectStore(STORE));
+      tx.oncomplete = () => { db.close(); res(req ? req.result : undefined); };
+      tx.onerror = tx.onabort = () => { db.close(); rej(tx.error || new Error('db')); };
+    }));
+  }
+  const dbPut = (rec) => dbTx('readwrite', (s) => s.put(rec));
+  const dbAll = () => dbTx('readonly', (s) => s.getAll());
+  const dbDel = (key) => dbTx('readwrite', (s) => s.delete(key));
+  const photoKey = (p) => p.name + '|' + p.lastModified;
+  function sameDay(t) {
+    const a = new Date(t), b = new Date();
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+  function archivePhoto(p, r) {         // stessa foto salvata piu' volte = un solo elemento (sostituito)
+    return dbPut({ key: photoKey(p), name: midName(p.name), blob: r.blob, w: r.w, h: r.h, t: Date.now(), lm: p.lastModified })
+      .catch((e) => console.warn('Archivio non aggiornato', e));
+  }
+  async function purgeOld() {
+    try {
+      const lim = Date.now() - KEEP_DAYS * 86400000;
+      for (const r of await dbAll()) if (r.t < lim) await dbDel(r.key);
+    } catch (e) { /* ignora */ }
+  }
+  async function todayRecords() {       // foto modificate oggi, comprese quelle ancora da salvare
+    const dirty = photos.filter(isDirty);
+    for (let i = 0; i < dirty.length; i++) {
+      busy(true, 'Preparo foto ' + (i + 1) + '/' + dirty.length + '...');
+      await archivePhoto(dirty[i], await renderJpeg(dirty[i]));
+    }
+    const all = await dbAll();
+    return all.filter((r) => sameDay(r.t)).sort((a, b) => (a.lm - b.lm) || a.name.localeCompare(b.name));
+  }
+  async function updateTodayCount() {
+    let n = 0;
+    try {
+      const keys = new Set((await dbAll()).filter((r) => sameDay(r.t)).map((r) => r.key));
+      photos.filter(isDirty).forEach((p) => keys.add(photoKey(p)));
+      n = keys.size;
+    } catch (e) { /* ignora */ }
+    const s = n ? ' (' + n + ')' : '';
+    $('mTodaySend').textContent = 'Invia foto modificate oggi' + s + ' (Telegram...)';
+    $('mTodayPdf').textContent = 'PDF delle foto modificate oggi' + s + ' (Telegram...)';
+  }
+
+  async function sendToday() {
+    hide('menuDlg');
+    let list;
+    busy(true, 'Preparo le foto di oggi...');
+    try { list = await todayRecords(); } catch (e) { console.error(e); busy(false); toast('Errore nella preparazione'); return; }
+    busy(false);
+    if (!list.length) { toast('Nessuna foto modificata oggi'); return; }
+    const files = list.map((r) => new File([r.blob], r.name, { type: 'image/jpeg' }));
+    if (!canShare(files)) { toast('Condivisione non supportata: puoi salvare i file'); showReady(files); return; }
+    try {
+      await navigator.share({ files, title: 'Foto rilievi (' + files.length + ')' });
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+      showReady(files);                 // se il browser richiede un nuovo tocco, riprova da qui
+    }
+  }
+
+  async function pdfToday() {
+    hide('menuDlg');
+    let list;
+    busy(true, 'Preparo le foto di oggi...');
+    try { list = await todayRecords(); } catch (e) { console.error(e); busy(false); toast('Errore nella preparazione'); return; }
+    if (!list.length) { busy(false); toast('Nessuna foto modificata oggi'); return; }
+    try {
+      const pages = [];
+      for (let i = 0; i < list.length; i++) {
+        busy(true, 'PDF: foto ' + (i + 1) + '/' + list.length + '...');
+        pages.push({ bytes: new Uint8Array(await list[i].blob.arrayBuffer()), w: list[i].w, h: list[i].h });
+        await sleep(0);
+      }
+      const file = new File([Pdf.build(pages)], 'Foto_rilievi_' + stamp() + '.pdf', { type: 'application/pdf' });
+      busy(false);
+      showReady([file]);
+    } catch (e) { console.error(e); busy(false); toast('Errore nella creazione del PDF'); }
+  }
+
+  /* ---------- installazione dell'app ---------- */
+  let deferredInstall = null;
+  const isStandalone = () => (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  function updateInstallUI() {
+    $('mInstall').hidden = isStandalone();
+    $('bigInstall').hidden = isStandalone() || !deferredInstall;
+  }
+  async function doInstall() {
+    hide('menuDlg');
+    if (deferredInstall) {
+      const ev = deferredInstall;
+      deferredInstall = null;
+      try { ev.prompt(); await ev.userChoice; } catch (e) { /* ignora */ }
+      updateInstallUI();
+      return;
+    }
+    alert('Per installare l\u0027app: apri questo indirizzo in Chrome (non dentro Telegram o altre app), poi tocca il menu \u22EE in alto a destra e scegli "Installa app" (oppure "Aggiungi a schermata Home").');
+  }
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstall = e; updateInstallUI(); });
+  window.addEventListener('appinstalled', () => { deferredInstall = null; updateInstallUI(); toast('App installata'); });
+
   /* ---------- icona per la schermata Home (iOS legge apple-touch-icon) ---------- */
   function makeAppleIcon() {
     try {
@@ -471,7 +594,7 @@
     $('btnPrev').addEventListener('click', () => goTo(idx - 1));
     $('btnNext').addEventListener('click', () => goTo(idx + 1));
     $('btnSave').addEventListener('click', saveCurrent);
-    $('btnMenu').addEventListener('click', () => show('menuDlg'));
+    $('btnMenu').addEventListener('click', () => { show('menuDlg'); updateTodayCount(); });
 
     document.querySelectorAll('[data-tool]').forEach((b) => b.addEventListener('click', () => Editor.toolTap(b.dataset.tool)));
     $('tDel').addEventListener('click', () => Editor.deleteSel());
@@ -487,9 +610,16 @@
     $('mSaveAll').addEventListener('click', saveAll);
     $('mShare').addEventListener('click', shareCurrent);
     $('mPdf').addEventListener('click', openPdfDlg);
+    $('mTodaySend').addEventListener('click', sendToday);
+    $('mTodayPdf').addEventListener('click', pdfToday);
+    $('mInstall').addEventListener('click', doInstall);
+    $('bigInstall').addEventListener('click', doInstall);
     $('mSettings').addEventListener('click', () => {
       hide('menuDlg');
       $('setAuto').checked = settings.autosave;
+      $('setPath').textContent = dirHandle
+        ? 'Cartella di salvataggio: ' + dirHandle.name + ' (cartella scelta con "Apri cartella").'
+        : 'Cartella di salvataggio: Download del telefono. La decide Chrome: per cambiarla vai in Chrome > Impostazioni > Download.';
       $('setInfo').textContent = dirHandle
         ? 'Sovrascrittura attiva: i file _mid vengono salvati nella cartella aperta (nome originale + _mid.jpg) e sostituiscono quelli precedenti.'
         : (window.showDirectoryPicker
@@ -522,11 +652,14 @@
 
     // file pronto
     $('readyShare').addEventListener('click', async () => {
-      try { await navigator.share({ files: [readyFile], title: readyFile.name }); }
+      try { await navigator.share({ files: readyFiles, title: readyFiles[0].name }); }
       catch (e) { if (!e || e.name !== 'AbortError') toast('Condivisione non riuscita'); }
     });
-    $('readySave').addEventListener('click', () => { if (readyFile) downloadBlob(readyFile, readyFile.name); });
-    $('readyClose').addEventListener('click', () => { hide('readyDlg'); readyFile = null; });
+    $('readySave').addEventListener('click', async () => {
+      if (!readyFiles) return;
+      for (const f of readyFiles) { downloadBlob(f, f.name); await sleep(400); }
+    });
+    $('readyClose').addEventListener('click', () => { hide('readyDlg'); readyFiles = null; });
 
     // testo
     $('textOk').addEventListener('click', () => {
@@ -563,5 +696,7 @@
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }
+  updateInstallUI();
+  purgeOld();
   startupCheck();
 })();

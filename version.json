@@ -1,6 +1,17 @@
 {
-  "version": "1.1.0",
+  "version": "1.2.0",
   "storico": [
+    {
+      "versione": "1.2.0",
+      "data": "2026-11-04",
+      "note": [
+        "Pulsante \"Installa app\" (schermata iniziale e Menu): non dipende più dalla proposta automatica di Chrome.",
+        "Menu: \"Invia foto modificate oggi\" manda in un colpo solo tutte le foto salvate o modificate in giornata (Telegram o altra app).",
+        "Menu: \"PDF delle foto modificate oggi\" crea un unico PDF da inviare, ad esempio su Telegram.",
+        "Impostazioni: indica la cartella di salvataggio delle foto.",
+        "L'app conserva per 7 giorni una copia delle foto modificate, per poterle inviare anche dopo aver chiuso l'app."
+      ]
+    },
     {
       "versione": "1.1.0",
       "data": "2026-11-04",
