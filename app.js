@@ -5,7 +5,7 @@
   const MAX_WORK = 3200;     // lato lungo massimo dell'immagine di lavoro (px)
   const MAX_SAVE = 1600;     // lato lungo massimo dei file _mid (px) - usare 1920 per file piu' grandi
   const QUALITY = 0.75;      // qualita' JPEG dei file _mid
-  const APP_VERSION = '1.2.0';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
+  const APP_VERSION = '1.3.0';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
 
   // Parole rapide per le note di testo (in ordine alfabetico)
   const QUICK_WORDS = [
@@ -20,10 +20,10 @@
   const $ = (id) => document.getElementById(id);
   const photos = [];
   let idx = -1, dirHandle = null, token = 0, toastT = 0, busyT = 0, readyFiles = null, textDone = null;
-  const settings = { autosave: true };
+  const settings = { savePhone: false };   // savePhone: scrive anche un file _mid sul telefono ad ogni cambio foto
   try {
     const s = JSON.parse(localStorage.getItem('fr_settings') || '{}');
-    if (typeof s.autosave === 'boolean') settings.autosave = s.autosave;
+    if (typeof s.savePhone === 'boolean') settings.savePhone = s.savePhone;
   } catch (e) { /* ignora */ }
   const saveSettings = () => { try { localStorage.setItem('fr_settings', JSON.stringify(settings)); } catch (e) { /* ignora */ } };
 
@@ -44,7 +44,8 @@
     busyT = setTimeout(() => { $('busy').hidden = false; }, 150);
   }
   const cur = () => photos[idx] || null;
-  const isDirty = (p) => JSON.stringify(p.annotations) !== p.savedJson;
+  const isDirty = (p) => JSON.stringify(p.annotations) !== p.savedJson;     // modifiche non ancora conservate nell'app
+  const needsFile = (p) => JSON.stringify(p.annotations) !== p.fileJson;   // modifiche non ancora scritte come file _mid
   const fmtSize = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
   function stamp() {
     const d = new Date(), z = (n) => String(n).padStart(2, '0');
@@ -79,7 +80,7 @@
   function mkPhoto(file) {
     return {
       file, name: file.name || ('foto_' + Date.now() + '.jpg'), lastModified: file.lastModified || 0,
-      work: null, loading: null, annotations: [], hist: null, hIdx: 0, savedJson: '[]'
+      work: null, loading: null, annotations: [], hist: null, hIdx: 0, savedJson: '[]', fileJson: '[]'
     };
   }
 
@@ -126,9 +127,11 @@
     if (i < 0 || i >= photos.length || i === idx) return;
     const my = ++token;
     const prev = cur();
-    if (prev && settings.autosave && isDirty(prev)) {
-      try { busy(true, 'Salvataggio...'); await saveOne(prev, true); }
-      catch (e) { console.error(e); toast('Salvataggio automatico non riuscito'); }
+    if (prev && isDirty(prev)) {         // salvataggio automatico silenzioso
+      try {
+        if (dirHandle || settings.savePhone) await saveOne(prev, true);   // file _mid (in cartella senza avvisi)
+        else await archiveOnly(prev);                                      // solo copia interna all'app: nessun file, nessun avviso
+      } catch (e) { console.error(e); toast('Salvataggio automatico non riuscito'); }
     }
     const p = photos[i];
     busy(true, 'Caricamento...');
@@ -200,6 +203,7 @@
     }
     if (where === 'download') downloadBlob(r.blob, name);
     p.savedJson = snap;
+    p.fileJson = snap;
     refreshHeader();
     if (!silent) toast((where === 'cartella' ? 'Salvata nella cartella: ' : 'File scaricato: ') + name + ' (' + fmtSize(r.blob.size) + ')');
     return where;
@@ -216,8 +220,8 @@
 
   async function saveAll() {
     hide('menuDlg');
-    const list = photos.filter(isDirty);
-    if (!list.length) { toast('Nessuna modifica da salvare'); return; }
+    const list = photos.filter(needsFile);
+    if (!list.length) { toast('Nessuna foto modificata da salvare sul telefono'); return; }
     let n = 0;
     for (const p of list) {
       busy(true, 'Salvo ' + (n + 1) + '/' + list.length + '...');
@@ -302,7 +306,7 @@
       const blob = Pdf.build(pages);
       const file = new File([blob], 'Foto_rilievi_' + stamp() + '.pdf', { type: 'application/pdf' });
       hide('pdfDlg');
-      showReady(file);
+      await shareOrReady([file]);
     } catch (e) {
       console.error(e);
       toast('Errore nella creazione del PDF');
@@ -477,11 +481,23 @@
       for (const r of await dbAll()) if (r.t < lim) await dbDel(r.key);
     } catch (e) { /* ignora */ }
   }
-  async function todayRecords() {       // foto modificate oggi, comprese quelle ancora da salvare
+  async function archiveOnly(p) {        // conserva la foto modificata solo nell'app (nessun file sul telefono)
+    const snap = JSON.stringify(p.annotations);
+    const r = await renderJpeg(p);
+    await archivePhoto(p, r);
+    p.savedJson = snap;
+    refreshHeader();
+  }
+  async function shareOrReady(files) {    // apre subito la condivisione; se il browser la rifiuta mostra "File pronto"
+    if (!canShare(files)) { showReady(files); return; }
+    try { await navigator.share({ files, title: files[0].name }); }
+    catch (e) { if (!e || e.name !== 'AbortError') showReady(files); }
+  }
+  async function todayRecords() {       // foto modificate oggi, comprese quelle ancora da conservare
     const dirty = photos.filter(isDirty);
     for (let i = 0; i < dirty.length; i++) {
       busy(true, 'Preparo foto ' + (i + 1) + '/' + dirty.length + '...');
-      await archivePhoto(dirty[i], await renderJpeg(dirty[i]));
+      await archiveOnly(dirty[i]);
     }
     const all = await dbAll();
     return all.filter((r) => sameDay(r.t)).sort((a, b) => (a.lm - b.lm) || a.name.localeCompare(b.name));
@@ -530,7 +546,7 @@
       }
       const file = new File([Pdf.build(pages)], 'Foto_rilievi_' + stamp() + '.pdf', { type: 'application/pdf' });
       busy(false);
-      showReady([file]);
+      await shareOrReady([file]);
     } catch (e) { console.error(e); busy(false); toast('Errore nella creazione del PDF'); }
   }
 
@@ -616,15 +632,13 @@
     $('bigInstall').addEventListener('click', doInstall);
     $('mSettings').addEventListener('click', () => {
       hide('menuDlg');
-      $('setAuto').checked = settings.autosave;
+      $('setAuto').checked = settings.savePhone;
       $('setPath').textContent = dirHandle
         ? 'Cartella di salvataggio: ' + dirHandle.name + ' (cartella scelta con "Apri cartella").'
-        : 'Cartella di salvataggio: Download del telefono. La decide Chrome: per cambiarla vai in Chrome > Impostazioni > Download.';
+        : 'Cartella dei file _mid (solo se li salvi): Download del telefono. La decide Chrome: per cambiarla vai in Chrome > Impostazioni > Download.';
       $('setInfo').textContent = dirHandle
-        ? 'Sovrascrittura attiva: i file _mid vengono salvati nella cartella aperta (nome originale + _mid.jpg) e sostituiscono quelli precedenti.'
-        : (window.showDirectoryPicker
-          ? 'Per sovrascrivere i file _mid usa "Apri cartella" invece di "Apri foto": cosi\u0027 il salvataggio sostituisce il file precedente.'
-          : 'Questo browser non permette di sovrascrivere i file: i _mid vengono scaricati (cartella Download) e se salvi di nuovo la stessa foto Android aggiunge un numero al nome, es. (1).');
+        ? 'Con la cartella aperta i file _mid vengono scritti li\u0027 senza avvisi e sostituiscono quelli precedenti.'
+        : 'Di norma le modifiche restano solo nell\u0027app: nessun file sul telefono e nessun avviso. Un file _mid viene scaricato solo con il pulsante Salva (o con l\u0027opzione sopra). Per il PDF o l\u0027invio basta il Menu.';
       show('setDlg');
     });
     $('mClose').addEventListener('click', () => hide('menuDlg'));
@@ -641,7 +655,11 @@
       applyUpdate();
     });
     $('verClose').addEventListener('click', () => hide('verDlg'));
-    $('setAuto').addEventListener('change', () => { settings.autosave = $('setAuto').checked; saveSettings(); });
+    $('setAuto').addEventListener('change', () => { settings.savePhone = $('setAuto').checked; saveSettings(); });
+    $('setClear').addEventListener('click', async () => {
+      if (!confirm('Cancellare le copie delle foto conservate nell\u0027app? Non toglie nulla dalla galleria o da Download.')) return;
+      try { await dbTx('readwrite', (s) => s.clear()); toast('Copie cancellate'); } catch (e) { toast('Operazione non riuscita'); }
+    });
     $('setClose').addEventListener('click', () => hide('setDlg'));
 
     // PDF
