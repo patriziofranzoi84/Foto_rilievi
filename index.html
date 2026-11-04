@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f11">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Foto rilievi">
+<title>Foto rilievi</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" id="appleIcon" href="icon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app" class="nophoto">
+
+  <!-- Barra superiore: apri, naviga, salva, menu -->
+  <header id="topbar">
+    <button class="ibtn" id="btnOpen" aria-label="Apri foto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    </button>
+    <button class="ibtn nav" id="btnPrev" aria-label="Foto precedente">&#8249;</button>
+    <div id="indicator">Nessuna foto</div>
+    <button class="ibtn nav" id="btnNext" aria-label="Foto successiva">&#8250;</button>
+    <button class="ibtn" id="btnSave" aria-label="Salva foto _mid">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h7V3M8 21v-7h8v7"/></svg>
+    </button>
+    <button class="ibtn" id="btnMenu" aria-label="Menu">&#8943;</button>
+  </header>
+
+  <!-- Area foto / disegno -->
+  <main id="stage">
+    <canvas id="cv"></canvas>
+
+    <div id="empty">
+      <h1>Foto rilievi</h1>
+      <p class="hint">Apri le foto scattate con la fotocamera per annotarle, ridurle (<b>_mid</b>), creare un PDF o condividerle.</p>
+      <button class="bigbtn" id="bigOpen">Apri ultime foto / Galleria</button>
+      <button class="bigbtn sec" id="bigDir" hidden>Apri cartella</button>
+    </div>
+
+    <div id="busy" hidden><span id="busyMsg">Caricamento...</span></div>
+  </main>
+
+  <!-- Barra strumenti -->
+  <footer id="toolbar">
+    <div class="trow">
+      <button class="tb" data-tool="select" id="tSel">
+        <svg viewBox="0 0 24 24"><path d="M5 3l14 7-6 2-2 7z"/></svg><span>Selez.</span>
+      </button>
+      <button class="tb" data-tool="arrow" id="tArrow">
+        <svg viewBox="0 0 24 24"><path d="M5 19L19 5M9 5h10v10"/></svg><span>Freccia</span>
+      </button>
+      <button class="tb" data-tool="line" id="tLine">
+        <svg viewBox="0 0 24 24"><path d="M5 19L19 5"/></svg><span>Linea</span>
+      </button>
+      <button class="tb" data-tool="free" id="tFree">
+        <svg viewBox="0 0 24 24"><path d="M4 14c2-8 5 4 8-2s5-6 8-2"/></svg><span>Mano</span>
+      </button>
+      <button class="tb" data-tool="text" id="tText">
+        <svg viewBox="0 0 24 24"><path d="M5 6h14M12 6v13M9 19h6"/></svg><span>Testo</span>
+      </button>
+      <button class="tb del" id="tDel" disabled aria-label="Elimina">
+        <svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13M10 11v6M14 11v6"/></svg><span>Elimina</span>
+      </button>
+    </div>
+    <div class="trow">
+      <button class="tb" id="pColor">
+        <i class="swatch" id="swatch"></i><span>Colore</span>
+      </button>
+      <button class="tb" id="pWidth">
+        <svg viewBox="0 0 24 24"><line id="wLine" x1="3" y1="12" x2="21" y2="12" stroke-width="4"/></svg><span id="wLabel">Medio</span>
+      </button>
+      <button class="tb" id="pDash">
+        <svg viewBox="0 0 24 24"><line id="dLine" x1="2" y1="12" x2="22" y2="12" stroke-width="3" stroke-linecap="butt"/></svg><span id="dLabel">Continuo</span>
+      </button>
+      <button class="tb" id="pSize">
+        <b class="big">A<small>+</small> <em id="sizeBig">M</em></b><span>Testo</span>
+      </button>
+      <button class="tb" id="pUndo" disabled>
+        <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-4"/></svg><span>Indietro</span>
+      </button>
+      <button class="tb" id="pRedo" disabled>
+        <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h4"/></svg><span>Avanti</span>
+      </button>
+      <button class="tb" id="pReset">
+        <b class="big">1:1</b><span>Zoom</span>
+      </button>
+    </div>
+  </footer>
+</div>
+
+<input type="file" id="fileInput" accept="image/*" multiple hidden>
+
+<!-- Dialogo testo -->
+<div class="modal top" id="textDlg" hidden>
+  <div class="sheet">
+    <h3>Testo</h3>
+    <textarea id="textInput" rows="3" placeholder="Scrivi la nota..."></textarea>
+    <div class="row">
+      <button id="textCancel">Annulla</button>
+      <button id="textOk" class="primary">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- Menu -->
+<div class="modal" id="menuDlg" hidden>
+  <div class="sheet">
+    <h3>Menu</h3>
+    <button class="mbtn" id="mSaveAll">Salva tutte le modificate (_mid)</button>
+    <button class="mbtn" id="mShare">Condividi foto corrente (Telegram...)</button>
+    <button class="mbtn" id="mPdf">Crea PDF delle foto...</button>
+    <button class="mbtn" id="mDir" hidden>Apri cartella</button>
+    <button class="mbtn" id="mSettings">Impostazioni</button>
+    <button class="mbtn" id="mClose">Chiudi</button>
+  </div>
+</div>
+
+<!-- Selezione foto per PDF -->
+<div class="modal" id="pdfDlg" hidden>
+  <div class="sheet">
+    <h3>PDF delle foto</h3>
+    <p class="hint">Una foto per pagina A4, con le annotazioni. Seleziona le foto da includere (&#9998; = annotata).</p>
+    <div class="plist" id="pdfList"></div>
+    <div class="row">
+      <button id="pdfAll">Tutte</button>
+      <button id="pdfNone">Nessuna</button>
+    </div>
+    <p class="hint" id="pdfInfo"></p>
+    <div class="row">
+      <button id="pdfCancel">Annulla</button>
+      <button id="pdfGo" class="primary">Crea PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- File pronto: condividi / salva -->
+<div class="modal" id="readyDlg" hidden>
+  <div class="sheet">
+    <h3>File pronto</h3>
+    <p class="hint" id="readyInfo"></p>
+    <button class="mbtn primary" id="readyShare">Condividi (Telegram...)</button>
+    <button class="mbtn" id="readySave">Salva sul telefono</button>
+    <button class="mbtn" id="readyClose">Chiudi</button>
+  </div>
+</div>
+
+<!-- Impostazioni -->
+<div class="modal" id="setDlg" hidden>
+  <div class="sheet">
+    <h3>Impostazioni</h3>
+    <label class="chk"><input type="checkbox" id="setAuto"> Salva automaticamente (_mid) quando cambi foto</label>
+    <p class="hint" id="setInfo"></p>
+    <button class="mbtn" id="setClose">Chiudi</button>
+  </div>
+</div>
+
+<div id="toast" hidden></div>
+
+<script src="editor.js"></script>
+<script src="pdf.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
