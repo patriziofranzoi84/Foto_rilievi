@@ -1,6 +1,15 @@
 {
-  "version": "1.5.1",
+  "version": "1.6.0",
   "storico": [
+    {
+      "versione": "1.6.0",
+      "data": "2026-11-04",
+      "note": [
+        "Aggiungere altre foto: il pulsante cartella in alto e Menu > Aggiungi altre foto mettono le nuove foto in coda, senza perdere quelle già aperte e le loro modifiche. Le foto già presenti non vengono duplicate.",
+        "Menu > Apri nuove foto: sostituisce le foto aperte (come prima).",
+        "Con delle foto aperte, il tasto Indietro del telefono non chiude più l'app (mostra un avviso). Per chiuderla: Menu ⋯ > Chiudi app, che conserva prima le modifiche."
+      ]
+    },
     {
       "versione": "1.5.1",
       "data": "2026-11-04",

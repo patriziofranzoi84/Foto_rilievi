@@ -5,7 +5,7 @@
   const MAX_WORK = 3200;     // lato lungo massimo dell'immagine di lavoro (px)
   const MAX_SAVE = 1600;     // lato lungo massimo dei file _mid (px) - usare 1920 per file piu' grandi
   const QUALITY = 0.75;      // qualita' JPEG dei file _mid
-  const APP_VERSION = '1.5.1';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
+  const APP_VERSION = '1.6.0';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
 
   // Parole rapide per le note di testo: tre elenchi affiancati (ordine alfabetico in ciascuno).
   // Una voce puo' essere una stringa oppure { t: 'testo', sub: [...] } = con sottomenu di scelta.
@@ -131,6 +131,7 @@
     photos.forEach((p) => { p.work = null; });
     photos.length = 0;
     list.forEach((p) => photos.push(p));
+    armGuard();
     idx = -1;
     dirHandle = dir || null;
     await goTo(photos.length - 1);         // apre subito l'ultima foto (la piu' recente)
@@ -659,13 +660,18 @@
   /* ---------- collegamento dei pulsanti ---------- */
   function wire() {
     const fileInput = $('fileInput');
-    const openFiles = () => fileInput.click();
-    $('btnOpen').addEventListener('click', openFiles);
-    $('bigOpen').addEventListener('click', openFiles);
+    let addMode = false;               // true = le foto scelte si aggiungono a quelle gia' aperte
+    const openFiles = (add) => { addMode = !!add && photos.length > 0; fileInput.click(); };
+    $('btnOpen').addEventListener('click', () => openFiles(true));
+    $('bigOpen').addEventListener('click', () => openFiles(false));
+    $('mAdd').addEventListener('click', () => { hide('menuDlg'); openFiles(true); });
+    $('mNew').addEventListener('click', () => { hide('menuDlg'); openFiles(false); });
+    $('mQuit').addEventListener('click', quitApp);
     fileInput.addEventListener('change', () => {
       const files = Array.from(fileInput.files || []);
       fileInput.value = '';
-      if (files.length) setPhotos(files, null);
+      if (!files.length) return;
+      if (addMode) addPhotos(files); else setPhotos(files, null);
     });
     if (window.showDirectoryPicker) {
       $('bigDir').hidden = false; $('mDir').hidden = false;
@@ -759,8 +765,57 @@
     });
 
     window.addEventListener('beforeunload', (e) => {
-      if (photos.some(isDirty)) { e.preventDefault(); e.returnValue = ''; }
+      if (guard) { e.preventDefault(); e.returnValue = ''; }
     });
+  }
+
+  /* ---------- aggiunta di altre foto e protezione dalla chiusura ---------- */
+  async function addPhotos(files) {     // aggiunge in coda: le foto gia' aperte e le loro modifiche restano dove sono
+    if (!photos.length) { await setPhotos(files, null); return; }
+    const have = new Set(photos.map(photoKey));
+    const list = files.map(mkPhoto).filter((p) => !have.has(photoKey(p)))
+      .sort((a, b) => (a.lastModified - b.lastModified) || a.name.localeCompare(b.name));
+    const skipped = files.length - list.length;
+    if (!list.length) { toast('Foto gi\u00E0 presenti: nessuna aggiunta'); return; }
+    const first = photos.length;
+    list.forEach((p) => photos.push(p));
+    refreshHeader();
+    toast('Aggiunte ' + list.length + ' foto' + (skipped ? ' (' + skipped + ' gi\u00E0 presenti)' : ''));
+    await goTo(first);                   // apre la prima foto aggiunta
+  }
+
+  // Con delle foto aperte l'app non si chiude con il tasto Indietro: solo da menu \u22EF > Chiudi app.
+  let guard = false, pushed = false;
+  function pushGuard() {
+    if (!guard || pushed) return;
+    try { history.pushState({ fr: 1 }, '', location.href); pushed = true; } catch (e) { /* ignora */ }
+  }
+  function armGuard() { guard = true; pushGuard(); }
+  document.addEventListener('pointerdown', pushGuard, { passive: true });     // alcuni browser vogliono un tocco
+  window.addEventListener('popstate', () => {
+    if (!guard) return;
+    pushed = false; pushGuard();
+    const open = ['textDlg', 'menuDlg', 'setDlg', 'readyDlg', 'pdfDlg', 'verDlg'].find((id) => !$(id).hidden);
+    if (open) { if (open === 'textDlg') textDone = null; hide(open); return; }   // Indietro chiude la finestra aperta
+    toast('Per chiudere l\u0027app: menu \u22EF > Chiudi app', 3500);
+  });
+
+  async function quitApp() {
+    hide('menuDlg');
+    if (!confirm('Chiudere l\u0027app? Le modifiche restano conservate nell\u0027app per 7 giorni.')) return;
+    busy(true, 'Conservo le modifiche...');
+    for (const p of photos.filter(isDirty)) {
+      try {
+        if (dirHandle || settings.savePhone) await saveOne(p, true); else await archiveOnly(p);
+      } catch (e) { console.error(e); }
+    }
+    busy(false);
+    guard = false;
+    toast('Modifiche conservate. Chiusura...', 2500);
+    setTimeout(() => {
+      try { window.close(); } catch (e) { /* ignora */ }
+      setTimeout(() => toast('Ora puoi chiudere l\u0027app dal telefono', 5000), 700);   // se il telefono non la chiude da solo
+    }, 400);
   }
 
   /* ---------- avvio ---------- */
