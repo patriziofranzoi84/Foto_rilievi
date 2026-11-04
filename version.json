@@ -1,6 +1,14 @@
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "storico": [
+    {
+      "versione": "1.4.0",
+      "data": "2026-11-04",
+      "note": [
+        "Parole rapide in tre elenchi affiancati: Elementi, Criticità, Misurazioni.",
+        "Misurazioni: \"fuoriuscita gas\" apre un sottomenu per scegliere bassa, media o alta."
+      ]
+    },
     {
       "versione": "1.3.0",
       "data": "2026-11-04",

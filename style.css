@@ -113,15 +113,24 @@ textarea{
   border:0;border-radius:12px;background:var(--btn);font-size:17px;font-weight:600;padding:0 16px;
 }
 .qtoggle[aria-expanded="true"]{background:var(--btn2)}
-.quick{
-  display:flex;flex-wrap:wrap;gap:6px;max-height:34vh;overflow:auto;margin-bottom:8px;padding:8px;
-  border:1px solid var(--line);border-radius:12px;background:#0d0f11;
+.quick{margin-bottom:8px;padding:6px;border:1px solid var(--line);border-radius:12px;background:#0d0f11}
+.qcols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.qcol{display:flex;flex-direction:column;gap:5px;max-height:32vh;overflow:auto}
+.qhead{
+  position:sticky;top:0;z-index:1;padding:5px 2px;font-size:11px;font-weight:700;text-align:center;
+  text-transform:uppercase;background:#0d0f11;border-bottom:3px solid var(--acc);
 }
+.q-el .qhead{border-color:#00E5FF}
+.q-cr .qhead{border-color:#FF5252}
+.q-mi .qhead{border-color:#00E676}
 .quick button{
-  min-height:44px;border:0;border-radius:22px;background:var(--btn);color:var(--txt);
-  font-size:15px;padding:0 14px;
+  min-height:42px;border:0;border-radius:10px;background:var(--btn);color:var(--txt);
+  font-size:13px;line-height:1.2;padding:6px 8px;text-align:left;overflow-wrap:anywhere;
 }
 .quick button:active{background:var(--acc);color:#000}
+.qsub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:6px;padding:8px;border-radius:10px;background:var(--btn2)}
+.qsub span{width:100%;font-size:14px;font-weight:700}
+.qsub button{flex:1;min-height:46px;text-align:center;font-size:15px;background:var(--btn)}
 
 /* Versione e novita' */
 .badge{

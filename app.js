@@ -5,17 +5,29 @@
   const MAX_WORK = 3200;     // lato lungo massimo dell'immagine di lavoro (px)
   const MAX_SAVE = 1600;     // lato lungo massimo dei file _mid (px) - usare 1920 per file piu' grandi
   const QUALITY = 0.75;      // qualita' JPEG dei file _mid
-  const APP_VERSION = '1.3.0';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
+  const APP_VERSION = '1.4.0';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
 
-  // Parole rapide per le note di testo (in ordine alfabetico)
-  const QUICK_WORDS = [
-    'dettaglio', 'infiltrazione', 'estradosso', 'intradosso', 'punto di insufflazione', 'scarico',
-    'videoispezione', 'presenza gocce d\u0027acqua', 'palloncino otturatore', 'fuoriuscita gas', 'volumetrico',
-    'igrometro umidit\u00E0 %', 'pluviale', 'scossalina', 'parapetto', 'porta', 'finestra', 'soglia',
-    'battiscopa', 'pozzetto', 'diametro insufficiente', 'ostruzione', 'distacco intonaco',
-    'distacco pitturazione', 'crepa', 'distacco guaina', 'in fase di asciugatura', 'cavillature',
-    'attraversamento impiantistico', 'umidit\u00E0 di risalita', 'quota insufficiente'
-  ].sort((a, b) => a.localeCompare(b, 'it'));
+  // Parole rapide per le note di testo: tre elenchi affiancati (ordine alfabetico in ciascuno).
+  // Una voce puo' essere una stringa oppure { t: 'testo', sub: [...] } = con sottomenu di scelta.
+  const QUICK_GROUPS = [
+    { title: 'Elementi', cls: 'q-el', items: [
+      'battiscopa', 'dettaglio', 'estradosso', 'finestra', 'intradosso', 'parapetto', 'pluviale', 'porta',
+      'pozzetto', 'risvolto di base', 'scarico', 'scossalina', 'soglia'
+    ] },
+    { title: 'Criticit\u00E0', cls: 'q-cr', items: [
+      'attraversamento impiantistico', 'cavillature', 'crepa', 'diametro insufficiente', 'distacco guaina',
+      'distacco intonaco', 'distacco pitturazione', 'in fase di asciugatura', 'infiltrazione', 'ostruzione',
+      'presenza gocce d\u0027acqua', 'quota insufficiente', 'risvolto', 'umidit\u00E0 di risalita'
+    ] },
+    { title: 'Misurazioni', cls: 'q-mi', items: [
+      'fluorescina', { t: 'fuoriuscita gas', sub: ['bassa', 'media', 'alta'] }, 'igrometro umidit\u00E0 %',
+      'insufflazione', 'palloncino otturatore', 'punto di insufflazione', 'videoispezione', 'volumetrico'
+    ] }
+  ].map((g) => {
+    const qt = (x) => (typeof x === 'string' ? x : x.t);
+    g.items = g.items.slice().sort((a, b) => qt(a).localeCompare(qt(b), 'it'));
+    return g;
+  });
 
   const $ = (id) => document.getElementById(id);
   const photos = [];
@@ -317,21 +329,52 @@
   }
 
   /* ---------- parole rapide nel dialogo testo ---------- */
+  function qBtn(label, onClick) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.addEventListener('pointerdown', (e) => e.preventDefault());     // la tastiera resta aperta
+    b.addEventListener('click', onClick);
+    return b;
+  }
+  function hideQuickSub() { const s = $('quickSub'); if (s) s.hidden = true; }
+  function showQuickSub(item) {        // sottomenu di scelta (es. fuoriuscita gas: bassa / media / alta)
+    const sub = $('quickSub');
+    sub.innerHTML = '';
+    const lab = document.createElement('span');
+    lab.textContent = item.t + ':';
+    sub.appendChild(lab);
+    item.sub.forEach((o) => sub.appendChild(qBtn(o, () => { addQuickWord(item.t + ' ' + o); hideQuickSub(); })));
+    sub.appendChild(qBtn('Annulla', hideQuickSub));
+    sub.hidden = false;
+  }
   function buildQuick() {
     const box = $('quickList');
-    QUICK_WORDS.forEach((w) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = w;
-      b.addEventListener('pointerdown', (e) => e.preventDefault());     // la tastiera resta aperta
-      b.addEventListener('click', () => addQuickWord(w));
-      box.appendChild(b);
+    const sub = document.createElement('div');
+    sub.id = 'quickSub'; sub.className = 'qsub'; sub.hidden = true;
+    box.appendChild(sub);
+    const cols = document.createElement('div');
+    cols.className = 'qcols';
+    QUICK_GROUPS.forEach((g) => {
+      const col = document.createElement('div');
+      col.className = 'qcol ' + g.cls;
+      const h = document.createElement('div');
+      h.className = 'qhead';
+      h.textContent = g.title;
+      col.appendChild(h);
+      g.items.forEach((it) => {
+        const o = typeof it === 'string' ? { t: it } : it;
+        col.appendChild(qBtn(o.sub ? o.t + ' \u25B8' : o.t, () => { if (o.sub) showQuickSub(o); else addQuickWord(o.t); }));
+      });
+      cols.appendChild(col);
     });
+    box.appendChild(cols);
     const tg = $('quickToggle');
     tg.addEventListener('pointerdown', (e) => e.preventDefault());
     tg.addEventListener('click', () => setQuickOpen(box.hidden));
   }
   function setQuickOpen(open) {
+    hideQuickSub();
     $('quickList').hidden = !open;
     $('quickToggle').setAttribute('aria-expanded', open ? 'true' : 'false');
     $('quickArrow').textContent = open ? '\u25B4' : '\u25BE';
