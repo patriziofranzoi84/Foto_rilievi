@@ -5,7 +5,7 @@
   const MAX_WORK = 3200;     // lato lungo massimo dell'immagine di lavoro (px)
   const MAX_SAVE = 1600;     // lato lungo massimo dei file _mid (px) - usare 1920 per file piu' grandi
   const QUALITY = 0.75;      // qualita' JPEG dei file _mid
-  const APP_VERSION = '1.6.0';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
+  const APP_VERSION = '1.7.0';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
 
   // Parole rapide per le note di testo: tre elenchi affiancati (ordine alfabetico in ciascuno).
   // Una voce puo' essere una stringa oppure { t: 'testo', sub: [...] } = con sottomenu di scelta.
@@ -284,7 +284,9 @@
   }
 
   /* ---------- PDF ---------- */
-  function openPdfDlg() {
+  let pdfMode = 'share';              // 'share' = condividi il PDF (Telegram...), 'save' = salvalo sul telefono
+  function openPdfDlg(mode) {
+    pdfMode = mode === 'save' ? 'save' : 'share';
     hide('menuDlg');
     if (!photos.length) { toast('Nessuna foto'); return; }
     const list = $('pdfList');
@@ -300,6 +302,7 @@
       list.appendChild(lab);
     });
     $('pdfInfo').textContent = '';
+    $('pdfGo').textContent = pdfMode === 'save' ? 'Salva PDF' : 'Crea PDF';
     show('pdfDlg');
   }
 
@@ -320,7 +323,8 @@
       const blob = Pdf.build(pages);
       const file = new File([blob], 'Foto_rilievi_' + stamp() + '.pdf', { type: 'application/pdf' });
       hide('pdfDlg');
-      await shareOrReady([file]);
+      if (pdfMode === 'save') { downloadBlob(file, file.name); toast('PDF scaricato: ' + file.name + ' (' + fmtSize(file.size) + ')'); }
+      else await shareOrReady([file]);
     } catch (e) {
       console.error(e);
       toast('Errore nella creazione del PDF');
@@ -376,7 +380,6 @@
     const box = $('quickList');
     const sub = document.createElement('div');
     sub.id = 'quickSub'; sub.className = 'qsub'; sub.hidden = true;
-    box.appendChild(sub);
     const cols = document.createElement('div');
     cols.className = 'qcols';
     QUICK_GROUPS.forEach((g) => {
@@ -393,6 +396,7 @@
       cols.appendChild(col);
     });
     box.appendChild(cols);
+    box.appendChild(sub);                 // le scelte (es. bassa / media / alta) compaiono SOTTO i tre elenchi
     const tg = $('quickToggle');
     tg.addEventListener('pointerdown', (e) => e.preventDefault());
     tg.addEventListener('click', () => setQuickOpen(box.hidden));
@@ -577,8 +581,8 @@
       n = keys.size;
     } catch (e) { /* ignora */ }
     const s = n ? ' (' + n + ')' : '';
-    $('mTodaySend').textContent = 'Invia foto modificate oggi' + s + ' (Telegram...)';
-    $('mTodayPdf').textContent = 'PDF delle foto modificate oggi' + s + ' (Telegram...)';
+    $('mTodaySend').textContent = 'Foto di oggi' + s;
+    $('mTodayPdf').textContent = 'PDF di oggi' + s;
   }
 
   async function sendToday() {
@@ -697,7 +701,9 @@
     // menu
     $('mSaveAll').addEventListener('click', saveAll);
     $('mShare').addEventListener('click', shareCurrent);
-    $('mPdf').addEventListener('click', openPdfDlg);
+    $('mPdf').addEventListener('click', () => openPdfDlg('share'));
+    $('mSavePdf').addEventListener('click', () => openPdfDlg('save'));
+    $('mNewSession').addEventListener('click', newSession);
     $('mTodaySend').addEventListener('click', sendToday);
     $('mTodayPdf').addEventListener('click', pdfToday);
     $('mInstall').addEventListener('click', doInstall);
@@ -799,6 +805,27 @@
     if (open) { if (open === 'textDlg') textDone = null; hide(open); return; }   // Indietro chiude la finestra aperta
     toast('Per chiudere l\u0027app: menu \u22EF > Chiudi app', 3500);
   });
+
+  async function newSession() {        // Menu > Nuovo: conserva le modifiche, chiude le foto aperte e riparte dalla schermata iniziale
+    hide('menuDlg');
+    if (!photos.length) { toast('Nessuna foto aperta'); return; }
+    if (!confirm('Chiudere le foto aperte e ripartire da zero? Le modifiche restano conservate nell\u0027app per 7 giorni.')) return;
+    busy(true, 'Conservo le modifiche...');
+    for (const p of photos.filter(isDirty)) {
+      try {
+        if (dirHandle || settings.savePhone) await saveOne(p, true); else await archiveOnly(p);
+      } catch (e) { console.error(e); }
+    }
+    busy(false);
+    token++;
+    photos.forEach((p) => { p.work = null; });
+    photos.length = 0;
+    idx = -1;
+    dirHandle = null;
+    guard = false;
+    Editor.setPhoto(null);
+    refreshHeader();
+  }
 
   async function quitApp() {
     hide('menuDlg');

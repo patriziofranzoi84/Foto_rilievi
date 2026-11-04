@@ -97,6 +97,18 @@ textarea{
   border:2px solid var(--line);background:#0d0f11;color:#fff;resize:none;
   -webkit-user-select:text;user-select:text;
 }
+/* Menu a gruppi: Nuovo in alto, Apri / Condividi / Salva, in fondo Versione e Chiudi app */
+.sheet.menu{padding-top:10px}
+.mhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.mhead h3{margin:0}
+.mx{width:44px;height:44px;border:0;border-radius:12px;background:var(--btn);font-size:20px;padding:0}
+.sheet.menu .mbtn{margin:0;min-height:54px;font-size:16px;padding:6px 12px;display:flex;align-items:center;line-height:1.2}
+.sheet.menu .mnew{margin-bottom:2px;background:var(--acc);color:#000;font-weight:700;font-size:18px}
+.mgrp{margin:12px 0 6px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--acc)}
+.mgrp:empty{margin:6px 0 0}
+.mgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.mgrid+.mgrid{margin-top:8px}
+.mfoot .mbtn{background:var(--btn2)}
 .row{display:flex;gap:10px;margin-top:12px}
 .row button{flex:1;min-height:56px;border:0;border-radius:14px;background:var(--btn);font-size:17px}
 .plist{max-height:40vh;overflow:auto;border:1px solid var(--line);border-radius:12px}
@@ -128,7 +140,7 @@ textarea{
   font-size:13px;line-height:1.2;padding:6px 8px;text-align:left;overflow-wrap:anywhere;
 }
 .quick button:active{background:var(--acc);color:#000}
-.qsub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:6px;padding:8px;border-radius:10px;background:var(--btn2)}
+.qsub{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 0;padding:8px;border-radius:10px;background:var(--btn2)}
 .qsub span{width:100%;font-size:14px;font-weight:700}
 .qsub button{flex:1;min-height:46px;text-align:center;font-size:15px;background:var(--btn)}
 .qnum{

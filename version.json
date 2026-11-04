@@ -1,6 +1,16 @@
 {
-  "version": "1.6.0",
+  "version": "1.7.0",
   "storico": [
+    {
+      "versione": "1.7.0",
+      "data": "2026-11-04",
+      "note": [
+        "Menu riordinato a gruppi, più rapido: in alto Nuovo, poi Apri foto (aggiungi a quelle aperte / nuove foto), Condividi (foto corrente, PDF, foto di oggi, PDF di oggi) e Salva (foto modificate, PDF); in fondo Versione e Chiudi app.",
+        "Salva > PDF delle foto: crea il PDF e lo salva direttamente sul telefono.",
+        "Nuovo: conserva le modifiche, chiude le foto aperte e riparte dalla schermata iniziale.",
+        "Parole rapide: le scelte bassa / media / alta (e la cella dell'igrometro) compaiono sotto i tre elenchi e non più sopra."
+      ]
+    },
     {
       "versione": "1.6.0",
       "data": "2026-11-04",
