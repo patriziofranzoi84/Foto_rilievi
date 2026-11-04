@@ -1,6 +1,15 @@
 {
-  "version": "1.4.0",
+  "version": "1.5.0",
   "storico": [
+    {
+      "versione": "1.5.0",
+      "data": "2026-11-04",
+      "note": [
+        "Note di testo ridimensionabili: con la nota selezionata, la maniglia gialla sul lato destro della casella ne cambia la larghezza e il testo va a capo da solo. La direttrice resta com'è.",
+        "Igrometro: toccando la voce compare una cella sopra l'elenco; scrivi due cifre (es. 05) e il valore viene inserito da solo (igrometro umidità 05%), poi puoi toccare altre voci.",
+        "Rotazione del telefono a 90°: l'app ora si adatta anche in orizzontale, con la barra strumenti a destra e la foto più grande."
+      ]
+    },
     {
       "versione": "1.4.0",
       "data": "2026-11-04",

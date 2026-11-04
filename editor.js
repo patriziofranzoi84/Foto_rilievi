@@ -140,14 +140,41 @@
   function redo() { if (cur && cur.hist && cur.hIdx < cur.hist.length - 1) { cur.hIdx++; restore(); } }
 
   /* ---------- testo: layout e geometria ---------- */
+  /* a capo automatico: spezza una riga in piu' righe che stanno in maxw (mctx.font gia' impostato) */
+  function wrapLine(ln, maxw) {
+    const out = [];
+    let line = '';
+    for (const wd of ln.split(' ')) {
+      const test = line ? line + ' ' + wd : wd;
+      if (mctx.measureText(test).width <= maxw) { line = test; continue; }
+      if (line) { out.push(line); line = ''; }
+      if (mctx.measureText(wd).width <= maxw) { line = wd; continue; }
+      let part = '';                                   // parola piu' larga della casella: spezzata
+      for (const ch of wd) {
+        if (part && mctx.measureText(part + ch).width > maxw) { out.push(part); part = ch; } else part += ch;
+      }
+      line = part;
+    }
+    out.push(line);
+    return out;
+  }
+  function minBoxW(a, Lp) { return TEXT_SIZES[a.s] * Lp * 3; }
   function layout(a, Lp) {
     const fs = TEXT_SIZES[a.s] * Lp;
     mctx.font = '600 ' + fs + 'px ' + FONT;
-    const lines = String(a.text).split('\n');
-    let tw = 0;
-    for (const ln of lines) tw = Math.max(tw, mctx.measureText(ln).width);
+    const raw = String(a.text).split('\n');
     const pad = fs * 0.4, lh = fs * 1.25;
-    return { fs, pad, lh, lines, w: tw + pad * 2, h: lines.length * lh + pad * 1.2 };
+    let lines = [], w;
+    if (a.bw) {                                        // larghezza scelta con la maniglia: il testo va a capo
+      w = Math.max(a.bw, minBoxW(a, Lp));
+      for (const ln of raw) lines.push(...wrapLine(ln, w - pad * 2));
+    } else {                                           // larghezza automatica (una riga per ogni a capo)
+      lines = raw;
+      let tw = 0;
+      for (const ln of lines) tw = Math.max(tw, mctx.measureText(ln).width);
+      w = tw + pad * 2;
+    }
+    return { fs, pad, lh, lines, w, h: lines.length * lh + pad * 1.2 };
   }
   function corners(b) {
     return [{ x: b.x, y: b.y }, { x: b.x + b.w, y: b.y }, { x: b.x + b.w, y: b.y + b.h }, { x: b.x, y: b.y + b.h }];
@@ -224,7 +251,10 @@
   /* ---------- selezione: alone e maniglie ---------- */
   function handlesOf(a) {
     if (a.type === 'line' || a.type === 'arrow') return [{ key: 'p1', p: a.p1 }, { key: 'p2', p: a.p2 }];
-    if (a.type === 'text') return [{ key: 'tip', p: a.tip }];
+    if (a.type === 'text') {
+      const b = layout(a, L);
+      return [{ key: 'tip', p: a.tip }, { key: 'bw', p: { x: a.x + b.w, y: a.y + b.h / 2 } }];   // punta + larghezza casella
+    }
     return [];
   }
   function drawHalo(c, a) {
@@ -257,8 +287,18 @@
     c.setLineDash([]);
     for (const h of handlesOf(a)) {
       c.beginPath(); c.arc(h.p.x, h.p.y, 12 * k, 0, Math.PI * 2);
-      c.fillStyle = '#fff'; c.fill();
+      c.fillStyle = h.key === 'bw' ? '#FFD600' : '#fff'; c.fill();
       c.lineWidth = 4 * k; c.strokeStyle = '#0078ff'; c.stroke();
+      if (h.key === 'bw') {                              // doppia freccia orizzontale: ridimensiona la casella
+        c.lineWidth = 3 * k; c.strokeStyle = '#000'; c.lineCap = 'round'; c.lineJoin = 'round';
+        c.beginPath();
+        c.moveTo(h.p.x - 7 * k, h.p.y); c.lineTo(h.p.x + 7 * k, h.p.y);
+        c.moveTo(h.p.x - 7 * k, h.p.y); c.lineTo(h.p.x - 3 * k, h.p.y - 4 * k);
+        c.moveTo(h.p.x - 7 * k, h.p.y); c.lineTo(h.p.x - 3 * k, h.p.y + 4 * k);
+        c.moveTo(h.p.x + 7 * k, h.p.y); c.lineTo(h.p.x + 3 * k, h.p.y - 4 * k);
+        c.moveTo(h.p.x + 7 * k, h.p.y); c.lineTo(h.p.x + 3 * k, h.p.y + 4 * k);
+        c.stroke();
+      }
     }
     c.restore();
   }
@@ -458,7 +498,10 @@
     } else if (mode === 'handle') {
       if (g.moved) {
         const a = getSel(), ip = toImg(sp);
-        if (a) a[g.h] = { x: ip.x + g.off.x, y: ip.y + g.off.y };
+        if (a && g.h === 'bw') {                         // larghezza della casella di testo
+          const mn = minBoxW(a, L), mxw = Math.max(mn, W - a.x);
+          a.bw = Math.min(mxw, Math.max(mn, ip.x + g.off.x - a.x));
+        } else if (a) a[g.h] = { x: ip.x + g.off.x, y: ip.y + g.off.y };
         requestDraw();
       }
     } else if (mode === 'empty') {

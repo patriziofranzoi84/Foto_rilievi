@@ -1,7 +1,7 @@
 /* Service worker - cache dell'app per apertura rapida e uso offline.
    Strategia: RETE PRIMA. Ad ogni apertura con connessione scarica la versione piu' recente dei file
    (e aggiorna la cache); se la rete manca o e' troppo lenta (4 s) usa la copia in cache. */
-const CACHE = 'foto-rilievi-v3';
+const CACHE = 'foto-rilievi-v4';
 const ASSETS = ['./', 'index.html', 'style.css', 'editor.js', 'pdf.js', 'app.js', 'manifest.json', 'icon.svg', 'version.json'];
 const TIMEOUT_MS = 4000;
 

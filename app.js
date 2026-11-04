@@ -5,7 +5,7 @@
   const MAX_WORK = 3200;     // lato lungo massimo dell'immagine di lavoro (px)
   const MAX_SAVE = 1600;     // lato lungo massimo dei file _mid (px) - usare 1920 per file piu' grandi
   const QUALITY = 0.75;      // qualita' JPEG dei file _mid
-  const APP_VERSION = '1.4.0';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
+  const APP_VERSION = '1.5.0';   // DEVE coincidere con "version" in version.json (da aggiornare insieme ad ogni rilascio)
 
   // Parole rapide per le note di testo: tre elenchi affiancati (ordine alfabetico in ciascuno).
   // Una voce puo' essere una stringa oppure { t: 'testo', sub: [...] } = con sottomenu di scelta.
@@ -20,7 +20,7 @@
       'presenza gocce d\u0027acqua', 'quota insufficiente', 'risvolto', 'umidit\u00E0 di risalita'
     ] },
     { title: 'Misurazioni', cls: 'q-mi', items: [
-      'fluorescina', { t: 'fuoriuscita gas', sub: ['bassa', 'media', 'alta'] }, 'igrometro umidit\u00E0 %',
+      'fluorescina', { t: 'fuoriuscita gas', sub: ['bassa', 'media', 'alta'] }, { t: 'igrometro umidit\u00E0 %', num: true, pre: 'igrometro umidit\u00E0 ', post: '%' },
       'insufflazione', 'palloncino otturatore', 'punto di insufflazione', 'videoispezione', 'volumetrico'
     ] }
   ].map((g) => {
@@ -348,6 +348,28 @@
     sub.appendChild(qBtn('Annulla', hideQuickSub));
     sub.hidden = false;
   }
+  function showQuickNum(item) {        // cella a 2 cifre (es. 05): a 2 cifre inserisce e si chiude da sola
+    const sub = $('quickSub');
+    sub.innerHTML = '';
+    const lab = document.createElement('span');
+    lab.textContent = item.t + ' \u2013 scrivi 2 cifre (es. 05):';
+    sub.appendChild(lab);
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.inputMode = 'numeric'; inp.maxLength = 2; inp.autocomplete = 'off';
+    inp.className = 'qnum'; inp.placeholder = '00';
+    inp.addEventListener('input', () => {
+      const v = inp.value.replace(/\D/g, '').slice(0, 2);
+      inp.value = v;
+      if (v.length === 2) {
+        addQuickWord(item.pre + v + item.post);
+        hideQuickSub();
+        $('textInput').focus();             // si torna al testo: si possono toccare altre voci
+      }
+    });
+    sub.append(inp, qBtn('Annulla', () => { hideQuickSub(); $('textInput').focus(); }));
+    sub.hidden = false;
+    inp.focus();
+  }
   function buildQuick() {
     const box = $('quickList');
     const sub = document.createElement('div');
@@ -364,7 +386,7 @@
       col.appendChild(h);
       g.items.forEach((it) => {
         const o = typeof it === 'string' ? { t: it } : it;
-        col.appendChild(qBtn(o.sub ? o.t + ' \u25B8' : o.t, () => { if (o.sub) showQuickSub(o); else addQuickWord(o.t); }));
+        col.appendChild(qBtn(o.sub ? o.t + ' \u25B8' : o.t, () => { if (o.sub) showQuickSub(o); else if (o.num) showQuickNum(o); else addQuickWord(o.t); }));
       });
       cols.appendChild(col);
     });
